@@ -1,22 +1,29 @@
-import akka.actor.{Actor, ActorLogging, Props, ActorSystem}
+import akka.actor._
 import akka.io._
+import akka.io.IO
 import akka.util.{CompactByteString, ByteString}
 import com.github.jodersky.flow.Serial._
 import com.github.jodersky.flow.Serial.CommandFailed
-import com.github.jodersky.flow.Serial.CommandFailed
 import com.github.jodersky.flow.Serial.Open
 import com.github.jodersky.flow.Serial.Open
+import com.github.jodersky.flow.Serial.Open
+import com.github.jodersky.flow.Serial.Opened
 import com.github.jodersky.flow.Serial.Opened
 import com.github.jodersky.flow.Serial.Opened
 import com.github.jodersky.flow.Serial.Received
+import com.github.jodersky.flow.Serial.Received
+import com.github.jodersky.flow.Serial.Register
 import com.github.jodersky.flow.Serial.Register
 import com.github.jodersky.flow.Serial.Write
+import com.github.jodersky.flow.Serial.Write
+import com.github.jodersky.flow.SerialSettings
 import com.github.jodersky.flow.SerialSettings
 import com.github.jodersky.flow.SerialSettings
 import com.github.jodersky.flow.{AccessDeniedException, Serial, SerialSettings}
 import java.nio.{ByteOrder, ByteBuffer}
 import scala.annotation.tailrec
 import scala.collection.immutable.Iterable
+import scala.Some
 import scala.Some
 
 object Main extends App {
@@ -33,13 +40,18 @@ object Main extends App {
   val system = ActorSystem("flow")
   val terminal = system.actorOf(Controller(settings), name = "terminal")
   //val terminal2 = system.actorOf(Terminal(settings2), name = "terminal2")
+
   system.registerOnTermination(println("Stopped terminal system."))
 }
+
 
 class Controller(settings: SerialSettings) extends Actor with ActorLogging {
 
   import Controller._
   import context._
+
+  val reader = actorOf(Props[Lo])
+  val reader2 = actorOf(Props(classOf[XBeeProcessor], reader, reader))
 
   override def preStart() = {
     log.info(s"Requesting manager to open port: ${settings.port}, baud: ${settings.baud}")
@@ -63,7 +75,7 @@ class Controller(settings: SerialSettings) extends Actor with ActorLogging {
     case CommandFailed(cmd: Open, reason) => println("could not open port for some other reason: " + reason.getMessage)
     case Opened(settings, op) => {
       val operator = sender
-      operator ! Register(self)
+      operator ! Register(reader2)
       operator ! Write(ByteString.apply(hex2bytes("7E 00 04 08 01 4E 44 64")))
       log.info("opened")
     }
