@@ -28,7 +28,7 @@ import scala.Some
 
 object Main extends App {
   val settings = SerialSettings(
-    port = "/dev/ttyUSB0",
+    port = "/dev/cu.usbserial-A702LZAR",
     baud = 9600
   )
 
@@ -76,7 +76,7 @@ class Controller(settings: SerialSettings) extends Actor with ActorLogging {
     case Opened(settings, op) => {
       val operator = sender
       operator ! Register(reader2)
-      operator ! Write(ByteString.apply(hex2bytes("7E 00 04 08 01 4E 44 64")))
+      operator ! Write(ByteString.apply(hex2bytes("7E 00 04 08 01 49 44 69")))
       log.info("opened")
     }
 
