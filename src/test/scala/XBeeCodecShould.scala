@@ -18,7 +18,7 @@ class XBeeCodecSpec extends FlatSpec with Matchers {
   }
 
   it should "have a checksum" in {
-    val a = "7e 00 04 08 43 4E 49 12".hex
+    val a = "7e 00 04 08 43 4E 49 1D".hex
     intercept[hubstep.MalformedXBeePacket] {
       XBeeCodec.parse1(a)
     }

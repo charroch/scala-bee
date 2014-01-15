@@ -22,43 +22,21 @@ object XBeeCodec {
     val size = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()
 
     if (a.head != 0x7e) throw new MalformedXBeePacket
-    val l = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()
+    val frameSize = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()
     val apiIdentifier = a(3)
-    val frame = a.slice(4, l + 3)
-    val checksum1 = a.last
-    val checksum = 0xFF - frame.foldRight(0x00) {
-      _ + _
-    }
+    val frame = a.slice(4, frameSize + 3)
+    val checksum = a.last
 
-    val verify = frame.foldRight(apiIdentifier.toByte) { (a, b) =>
-      (a + b).toByte
-    } + checksum1
-
+    val verify = frame.foldLeft(apiIdentifier) { (a, b) =>
+      ( b + a).toByte
+    } + checksum.toByte
 
     val as = 0xff
-    val t = verify == 0xFF
+    val t = verify.toByte == 0xFF.toByte
 
-    val te = 2
+    val c = new xbee.XBeePacket(apiIdentifier, frameSize,frame, checksum)
+    val teee = c.verifyChecksum()
   }
-
-  //  def p(s: Stream[Byte]) = {
-  //    for (
-  //      header:Byte <- s.head;
-  //      //frameLength <- Some(s.tail) if (header == 0x7e) { Some(2) } else None
-  //
-  //    )
-  //  }
-  //
-  //  def a(a: Array[Byte]) = a match {
-  //    case 0x7e:: tail => asFrame(bytes2short(tail(0), tail(1)), tail.slice(2, tail.size))
-  //  }
-
-  //  def a(a: Array[Byte]) = a match {
-  //    case 0x7e :: b :: a => ""
-  //    case encoding => "fdwefe"
-  //  }
-
-  // def encoding = (a: Array[Byte]) => a match { case 0x7e :: s1 :: s2 :: rest => asFrame((bytes2short(s1, s2), rest)) }
 
   def asFrame(length: Short, tail: Array[Byte]) = {
 
