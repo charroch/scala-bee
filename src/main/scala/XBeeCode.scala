@@ -18,8 +18,7 @@ object XBeeCodec {
 
 
   def parse1(a: Array[Byte]) = {
-    val head = a.head
-    val size = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()
+
 
     if (a.head != 0x7e) throw new MalformedXBeePacket
     val frameSize = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()

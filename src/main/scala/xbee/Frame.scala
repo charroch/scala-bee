@@ -4,23 +4,33 @@ import akka.io._
 import akka.util.ByteString
 import akka.actor.{Props, Actor, ActorRef}
 import com.github.jodersky.flow.Serial.Received
+import java.nio.ByteBuffer
 
 class Message(val byte: Array[Byte])
 
 class LengthFieldFrame extends SymmetricPipelineStage[PipelineContext, ByteString, ByteString] {
 
+  var buffer = None: Option[ByteString]
+  var frameSize = 0
+
+  def extractFrames(bs: ByteString, acc: List[ByteString]): (Option[ByteString], Seq[ByteString]) = {
+    def size(a: Byte, b: Byte): Int = a << 8 | b;
+    bs.toList match {
+      case 0x7e :: a :: b :: rest if rest.size < size(a, b) + 4 =>
+        (Some(bs.drop(size(a,b) + 4)), acc ++ Some(bs.take(size(a, b) + 4)))
+      case Nil => (None, Seq(ByteString.empty))
+    }
+  }
+
   def apply(ctx: PipelineContext) = new SymmetricPipePair[ByteString, ByteString] {
 
-    var buffer = None: Option[ByteString]
+
 
     override def commandPipeline = {
       bs: ByteString ⇒
         ???
     }
 
-    def extractFrames(bs: ByteString, acc: List[ByteString]): (Option[ByteString], Seq[ByteString]) = {
-      (None, Seq(ByteString.empty))
-    }
 
     def eventPipeline = {
       bs: ByteString ⇒ {
