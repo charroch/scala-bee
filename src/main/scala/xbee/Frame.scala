@@ -6,31 +6,31 @@ import akka.actor.{Props, Actor, ActorRef}
 import com.github.jodersky.flow.Serial.Received
 import java.nio.ByteBuffer
 
-class Message(val byte: Array[Byte])
-
 class LengthFieldFrame extends SymmetricPipelineStage[PipelineContext, ByteString, ByteString] {
-
   var buffer = None: Option[ByteString]
-  var frameSize = 0
-
+  val HEADER_LENGTH = 4
   def extractFrames(bs: ByteString, acc: List[ByteString]): (Option[ByteString], Seq[ByteString]) = {
     def size(a: Byte, b: Byte): Int = a << 8 | b;
     bs.toList match {
-      case 0x7e :: a :: b :: rest if rest.size < size(a, b) + 4 =>
-        (Some(bs.drop(size(a,b) + 4)), acc ++ Some(bs.take(size(a, b) + 4)))
-      case Nil => (None, Seq(ByteString.empty))
+      case 0x7e :: Nil => (Some(bs), acc)
+      case 0x7e :: rest if rest.size < 3 => (Some(bs), acc)
+      case 0x7e :: rest if rest.size < 3 => (Some(bs), acc)
+      case 0x7e :: a :: b :: api :: rest if rest.size < size(a, b) => (Some(bs), acc)
+      case 0x7e :: s0:: s1 :: api :: rest if rest.size >= size(s0, s1) => {
+        val frameLength = size(s0, s1) + HEADER_LENGTH
+        val frame = bs.take(frameLength)
+        extractFrames(bs.drop(frameLength), acc ++ Some(frame))
+      }
+      case Nil => (None, acc)
+      case _ => extractFrames(bs.drop(1), acc)
     }
   }
 
   def apply(ctx: PipelineContext) = new SymmetricPipePair[ByteString, ByteString] {
-
-
-
     override def commandPipeline = {
       bs: ByteString ⇒
         ???
     }
-
 
     def eventPipeline = {
       bs: ByteString ⇒ {
@@ -47,21 +47,44 @@ class LengthFieldFrame extends SymmetricPipelineStage[PipelineContext, ByteStrin
   }
 }
 
-class XBeeFrame extends SymmetricPipelineStage[PipelineContext, Message, ByteString] {
-  def apply(ctx: PipelineContext) = new SymmetricPipePair[Message, ByteString] {
+class XBeeFrame extends SymmetricPipelineStage[PipelineContext, Response, ByteString] {
+  def apply(ctx: PipelineContext) = new SymmetricPipePair[Response, ByteString] {
     def eventPipeline = {
       bs: ByteString ⇒ {
-        //???
-        import hubstep.utils.HexUtil._
-        ctx.singleEvent(new Message("0101FFFF01".hex))
+        ctx.singleEvent(XBeePacket2.unapply(bs))
       }
     }
 
     override def commandPipeline = {
-      bs: Message ⇒
+      bs: Response ⇒
         ???
     }
 
+  }
+}
+
+sealed trait Response
+case class AT(frame: Array[Byte]) extends Response
+case class AT_RESPONSE(frame: ByteString) extends Response
+
+//lass XBeePacket(r: Response)
+object XBeePacket2 {
+  def unapply(
+              s: ByteString) = {
+    val a = s.toArray
+    if (a.head != 0x7e) throw new Error
+    val frameSize = ByteBuffer.wrap(a.slice(1, 3)).asShortBuffer().get()
+    val apiIdentifier = a(3)
+    val frame = a.slice(4, frameSize + 3)
+    val checksum = a.last
+    val verify = frame.foldLeft(apiIdentifier) { (a, b) =>
+      ( b + a).toByte
+    } + checksum.toByte
+    val t = verify.toByte == 0xFF.toByte
+
+    apiIdentifier match {
+      case 0x08 => AT(frame)
+    }
   }
 }
 
